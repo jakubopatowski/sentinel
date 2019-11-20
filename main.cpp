@@ -7,6 +7,9 @@
 
 #include "CivetServer.h"
 #include <cstring>
+#include <iostream>
+#include <string>
+#include <fstream>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -34,12 +37,9 @@ public:
 class ExampleHandler: public CivetHandler
 {
 public:
-    bool
-        handleGet( CivetServer* server, struct mg_connection* conn )
+    bool handleGet( CivetServer* server, struct mg_connection* conn )
     {
-        mg_printf( conn,
-                   "HTTP/1.1 200 OK\r\nContent-Type: "
-                   "text/html\r\nConnection: close\r\n\r\n" );
+        mg_printf( conn, Tools::header() );
         mg_printf( conn, "<html><body>\r\n" );
         mg_printf( conn,
                    "<h2>This is an example text from a C++ handler</h2>\r\n" );
@@ -76,12 +76,32 @@ public:
     }
 };
 
-class HelpPage: public CivetHandler
+class HelpHandler: public CivetHandler
 {
 public:
-    bool handleGet( CivetServer server, struct mg_connection* conn )
+    bool handleGet( CivetServer* server, struct mg_connection* conn )
     {
         mg_printf( conn, Tools::header() );
+
+        std::string line;
+        std::ifstream helpFile( "A1-dziennik.htm" );
+
+        if ( helpFile.is_open() ) {
+            while ( std::getline( helpFile, line ) ) {
+                mg_printf( conn, line.c_str() );
+                mg_printf( conn, "\r\n" );
+            }
+        }
+
+        return true;
+    }
+};
+
+class ImageHandler: public CivetHandler
+{
+public:
+    bool handleGet( CivetServer* server, struct mg_connection* conn)
+    {
         return true;
     }
 };
@@ -89,7 +109,7 @@ public:
 class ExitHandler: public CivetHandler
 {
 public:
-    bool handleGet( CivetServer* server, struct mg_connection* conn )
+    bool handleGet( CivetServer server, struct mg_connection* conn )
     {
         mg_printf( conn,
                    "HTTP/1.1 200 OK\r\nContent-Type: "
@@ -103,8 +123,7 @@ public:
 class AHandler: public CivetHandler
 {
 private:
-    bool
-        handleAll( const char* method,
+    bool handleAll( const char* method,
                    CivetServer* server,
                    struct mg_connection* conn )
     {
@@ -125,13 +144,11 @@ private:
     }
 
 public:
-    bool
-        handleGet( CivetServer* server, struct mg_connection* conn )
+    bool handleGet( CivetServer* server, struct mg_connection* conn )
     {
         return handleAll( "GET", server, conn );
     }
-    bool
-        handlePost( CivetServer* server, struct mg_connection* conn )
+    bool handlePost( CivetServer* server, struct mg_connection* conn )
     {
         return handleAll( "POST", server, conn );
     }
@@ -140,8 +157,7 @@ public:
 class ABHandler: public CivetHandler
 {
 public:
-    bool
-        handleGet( CivetServer* server, struct mg_connection* conn )
+    bool handleGet( CivetServer* server, struct mg_connection* conn )
     {
         mg_printf( conn,
                    "HTTP/1.1 200 OK\r\nContent-Type: "
@@ -156,8 +172,7 @@ public:
 class FooHandler: public CivetHandler
 {
 public:
-    bool
-        handleGet( CivetServer* server, struct mg_connection* conn )
+    bool handleGet( CivetServer* server, struct mg_connection* conn )
     {
         /* Handler may access the request info using mg_get_request_info */
         const struct mg_request_info* req_info = mg_get_request_info( conn );
@@ -177,8 +192,8 @@ public:
 
         return true;
     }
-    bool
-        handlePost( CivetServer* server, struct mg_connection* conn )
+
+    bool handlePost( CivetServer* server, struct mg_connection* conn )
     {
         /* Handler may access the request info using mg_get_request_info */
         const struct mg_request_info* req_info = mg_get_request_info( conn );
@@ -225,8 +240,7 @@ public:
 
 #define fopen_recursive fopen
 
-    bool
-        handlePut( CivetServer* server, struct mg_connection* conn )
+    bool handlePut( CivetServer* server, struct mg_connection* conn )
     {
         /* Handler may access the request info using mg_get_request_info */
         const struct mg_request_info* req_info = mg_get_request_info( conn );
@@ -310,8 +324,7 @@ public:
 class WsStartHandler: public CivetHandler
 {
 public:
-    bool
-        handleGet( CivetServer* server, struct mg_connection* conn )
+    bool handleGet( CivetServer* server, struct mg_connection* conn )
     {
 
         mg_printf( conn,
@@ -362,7 +375,6 @@ public:
     }
 };
 
-
 #ifdef USE_WEBSOCKET
 class WebSocketHandler: public CivetWebSocketHandler {
 
@@ -400,9 +412,7 @@ class WebSocketHandler: public CivetWebSocketHandler {
 };
 #endif
 
-
-int
-main( int argc, char* argv[] )
+int main( int argc, char* argv[] )
 {
     const char* options[] = {
         "document_root", DOCUMENT_ROOT, "listening_ports", PORT, 0 };
@@ -412,7 +422,6 @@ main( int argc, char* argv[] )
         cpp_options.push_back( options[ i ] );
     }
 
-    // CivetServer server(options); // <-- C style start
     CivetServer server( cpp_options ); // <-- C++ style start
 
     ExampleHandler h_ex;
@@ -421,17 +430,20 @@ main( int argc, char* argv[] )
     ExitHandler h_exit;
     server.addHandler( EXIT_URI, h_exit );
 
-    HelpPage h_help;
-    server.addHandler( "/help", h_help );
-
     AHandler h_a;
-    server.addHandler( "/a", h_a );
-
+    //server.addHandler( "/a", h_a );
+   
     ABHandler h_ab;
-    server.addHandler( "/a/b", h_ab );
+    //server.addHandler( "/a/b", h_ab );
 
     WsStartHandler h_ws;
     server.addHandler( "/ws", h_ws );
+
+    HelpHandler h_help;
+    server.addHandler( "/help", h_help );
+
+    ImageHandler h_image;
+    server.addHandler( "**.png", h_image );
 
 #ifdef NO_FILES
     /* This handler will handle "everything else", including
@@ -444,7 +456,10 @@ main( int argc, char* argv[] )
 #else
     FooHandler h_foo;
     server.addHandler( "**.foo", h_foo );
-    printf( "Browse files at http://localhost:%s/\n", PORT );
+    //server.addHandler( "/a", h_foo );
+
+    std::cout << "Browse files at http ://localhost:" << PORT << "/" << std::endl;
+    //printf( "Browse files at http://localhost:%s/\n", PORT );
 #endif
 
 #ifdef USE_WEBSOCKET
@@ -452,9 +467,8 @@ main( int argc, char* argv[] )
     server.addWebSocketHandler( "/websocket", h_websocket );
     printf( "Run websocket example at http://localhost:%s/ws\n", PORT );
 #endif
-
-    printf( "Run example at http://localhost:%s%s\n", PORT, EXAMPLE_URI );
-    printf( "Exit at http://localhost:%s%s\n", PORT, EXIT_URI );
+    std::cout << "Run example at http://localhost:" << PORT << EXAMPLE_URI << std::endl;
+    std::cout << "Exit at http://localhost:" << PORT << EXIT_URI << std::endl;
 
     while ( !exitNow ) {
 #ifdef _WIN32
@@ -464,7 +478,7 @@ main( int argc, char* argv[] )
 #endif
     }
 
-    printf( "Bye!\n" );
+    std::cout << "Bye!" << std::endl;
 
     return 0;
 }
