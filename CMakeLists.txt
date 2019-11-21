@@ -20,11 +20,14 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(project_sources
   main.cpp
   civetweb/CivetServer.cpp
-  civetweb/civetweb.c)
+  civetweb/civetweb.c
+  sqlite3/sqlite3.c)
 
 set(project_headers
   civetweb/CivetServer.h
-  civetweb/civetweb.h)
+  civetweb/civetweb.h
+  sqlite3/sqlite3.h
+  sqlite3/sqlite3ext.h)
 
 #=====================
 # ..:: Visual Studio Setup ::..

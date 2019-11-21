@@ -6,6 +6,7 @@
  // Simple example program on how to use Embedded C++ interface.
 
 #include "CivetServer.h"
+#include "sqlite3.h"
 #include <cstring>
 #include <iostream>
 #include <string>
@@ -25,6 +26,146 @@
 
 /* Exit flag for main loop */
 volatile bool exitNow = false;
+
+class Db{
+public:
+    Db( const std::string& db_name ):
+        m_db_name( db_name ){
+        
+
+        create_data_types =
+            "CREATE TABLE DATA_TYPES("
+            "ID INT PRIMARY KEY NOT NULL, "
+            "TYPE_NAME TEXT NOT NULL);";
+
+        read_blob =
+            "SELECT DATA FROM TABLE HELP WHERE URL =";
+    }
+    ~Db(){}
+
+    int open_db(){
+        m_status = sqlite3_open( m_db_name.c_str(), &m_db );
+        if( m_status ){
+            std::cout << "Nie mo¿na nawi¹zaæ po³¹czenia z baz¹ "
+                << m_db_name
+                << ": "
+                << sqlite3_errmsg( m_db )
+                << std::endl;
+            sqlite3_close( m_db );
+        }
+        else{
+            std::cout << "Nawi¹zano po³¹czenie z baz¹ "
+                << m_db_name
+                << std::endl;
+        }
+
+        return m_status;
+    }
+
+    int close_db(){
+        m_status = sqlite3_close( m_db );
+        std::cout << "Zamkniêto po³¹czenie z baz¹ " << m_db_name << std::endl;
+        return m_status;
+    }
+
+    int create_tables(){
+        std::string create_help =
+            "CREATE TABLE HELP("
+            "URL TEXT UNIQUE NOT NULL, "
+            "DATA_TYPE INT NOT NULL, "
+            "DATA BLOB NOT NULL);";
+
+        char* errmsg;
+        m_status = sqlite3_exec( m_db, create_help.c_str(), NULL, 0, &errmsg );
+        if( m_status != SQLITE_OK ){
+            std::cout << "Error create table HELP !" << std::endl;
+        }
+        else{
+            std::cout << "Table HELP created !" << std::endl;
+        }
+
+        return m_status;
+    }
+
+    int get_blob( const std::string& uri ){
+        std::string query =
+            "SELECT data FROM HELP where uri=" + uri + ";";
+        sqlite3_stmt* stmt;
+        m_status = sqlite3_prepare_v2( m_db, query.c_str(), -1, &stmt, 0 );
+        std::cout << "sqlite3_prepare_v2 status: " << m_status << std::endl;
+        m_status = sqlite3_step( stmt );
+        std::cout << "sqlite3_step status: " << m_status << std::endl;
+        char* result = ( char* )sqlite3_column_blob( stmt, 0 );
+    }
+
+    int insert_blob( const std::string& uri, int data_type, const std::string& file_path ){
+        std::ifstream file( file_path, std::ios::in | std::ios::binary );
+        if( !file ){
+            std::cout << "Nie mo¿na otworzyæ pliku! " << std::endl;
+            return SQLITE_ERROR;
+        }
+        file.seekg( 0, std::ifstream::end );
+        std::streampos size = file.tellg();
+        file.seekg( 0 );
+
+        char* buffer = new char[ size ];
+        file.read( buffer, size );
+
+        sqlite3_stmt* stmt;
+        std::string query =
+            "INSERT INTO HELP(URL, DATA_TYPE, DATA) VALUES(?, ?, ?);";
+        m_status = sqlite3_prepare_v2( m_db, query.c_str(), -1, &stmt, 0 );
+        if( m_status != SQLITE_OK ){
+            std::cout << "sqlite3_prepare_v2 failed: " << m_status << std::endl;
+            return m_status;
+        }
+
+        m_status = sqlite3_bind_text( stmt, 1, uri.c_str(), uri.size(), SQLITE_STATIC );
+        if( m_status != SQLITE_OK ){
+            std::cout << "bind failed: " << sqlite3_errmsg( m_db ) << std::endl;
+        }
+
+        m_status = sqlite3_bind_int( stmt, 2, data_type );
+        if( m_status != SQLITE_OK ){
+            std::cout << "bind failed: " << sqlite3_errmsg( m_db ) << std::endl;
+        }
+
+        m_status = sqlite3_bind_text( stmt, 3, buffer, size, SQLITE_STATIC );
+        if( m_status != SQLITE_OK ){
+            std::cout << "bind failed: " << sqlite3_errmsg( m_db ) << std::endl;
+        }
+
+        m_status = sqlite3_step( stmt );
+        if( m_status != SQLITE_DONE ){
+            std::cout << "execution failed: " << sqlite3_errmsg( m_db ) << std::endl;
+        }
+        sqlite3_finalize( stmt );
+        return m_status;
+    }
+
+    static int callback( void* data, int argc, char** argv, char** azColName ){
+        int i;
+        std::cout << ( const char* )data << std::endl;
+        for( i = 0; i < argc; ++i ){
+            std::string tmp = argv[ i ] ? argv[ i ] : "Null";
+            std::cout << azColName[ i ] << " = " << tmp << std::endl;
+        }
+        return 0;
+    }
+
+    int exex_db( const std::string& query ){
+        char* error_msg = 0;
+        m_status = sqlite3_exec( m_db, query.c_str(), callback, 0, &error_msg );
+    }
+private:
+    int m_status;
+    sqlite3* m_db;
+    std::string m_db_name;
+
+    //zapytania
+    std::string create_data_types;
+    std::string read_blob;
+};
 
 class Tools
 {
@@ -102,6 +243,8 @@ class ImageHandler: public CivetHandler
 public:
     bool handleGet( CivetServer* server, struct mg_connection* conn)
     {
+        const struct mg_request_info* req_info = mg_get_request_info( conn );
+        std::cout << req_info->request_uri << std::endl;
         return true;
     }
 };
@@ -444,6 +587,7 @@ int main( int argc, char* argv[] )
 
     ImageHandler h_image;
     server.addHandler( "**.png", h_image );
+    server.addHandler( "**.jpg", h_image );
 
 #ifdef NO_FILES
     /* This handler will handle "everything else", including
@@ -470,6 +614,11 @@ int main( int argc, char* argv[] )
     std::cout << "Run example at http://localhost:" << PORT << EXAMPLE_URI << std::endl;
     std::cout << "Exit at http://localhost:" << PORT << EXIT_URI << std::endl;
 
+    Db db( "test.db" );
+    db.open_db();
+    db.create_tables();
+    db.insert_blob( "/help", 1, "c:\\Jopa\\HOME\\Projekty\\sentinel\\build\\A1-dziennik.htm" );
+
     while ( !exitNow ) {
 #ifdef _WIN32
         Sleep( 1000 );
@@ -478,6 +627,7 @@ int main( int argc, char* argv[] )
 #endif
     }
 
+    db.close_db();
     std::cout << "Bye!" << std::endl;
 
     return 0;
