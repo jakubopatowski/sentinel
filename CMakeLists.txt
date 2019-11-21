@@ -19,12 +19,12 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 set(project_sources
   main.cpp
-  CivetServer.cpp
-  civetweb.c)
+  civetweb/CivetServer.cpp
+  civetweb/civetweb.c)
 
 set(project_headers
-  CivetServer.h
-  civetweb.h)
+  civetweb/CivetServer.h
+  civetweb/civetweb.h)
 
 #=====================
 # ..:: Visual Studio Setup ::..
@@ -52,7 +52,10 @@ target_compile_options(${PROJECT_NAME} PRIVATE
 
 target_include_directories(${PROJECT_NAME}
   PUBLIC
-  ${PROJECT_SOURCE_DIR})
+  ${PROJECT_SOURCE_DIR}
+  PRIVATE
+  sqlite3
+  civetweb)
 
 # auto copy dlls if on windows
 if(MSVS)
