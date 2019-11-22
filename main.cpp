@@ -29,19 +29,10 @@ volatile bool exitNow = false;
 
 class Db{
 public:
-    Db( const std::string& db_name ):
-        m_db_name( db_name ){
-        
-
-        create_data_types =
-            "CREATE TABLE DATA_TYPES("
-            "ID INT PRIMARY KEY NOT NULL, "
-            "TYPE_NAME TEXT NOT NULL);";
-
-        read_blob =
-            "SELECT DATA FROM TABLE HELP WHERE URL =";
+    static Db& getInstance(){
+        static Db instance;
+        return instance;
     }
-    ~Db(){}
 
     int open_db(){
         m_status = sqlite3_open( m_db_name.c_str(), &m_db );
@@ -87,15 +78,27 @@ public:
         return m_status;
     }
 
-    int get_blob( const std::string& uri ){
+    std::string get_blob( const std::string& uri ){
+        std::string result;
         std::string query =
-            "SELECT data FROM HELP where uri=" + uri + ";";
+            "SELECT data FROM HELP where url='" + uri + "';";
         sqlite3_stmt* stmt;
+      
         m_status = sqlite3_prepare_v2( m_db, query.c_str(), -1, &stmt, 0 );
-        std::cout << "sqlite3_prepare_v2 status: " << m_status << std::endl;
+        if( m_status != SQLITE_OK ){
+            std::cout << "sqlite3_prepare_v2 failed: " << sqlite3_errmsg( m_db ) << std::endl;
+            return result;
+        }
+      
         m_status = sqlite3_step( stmt );
-        std::cout << "sqlite3_step status: " << m_status << std::endl;
-        char* result = ( char* )sqlite3_column_blob( stmt, 0 );
+        if( m_status != SQLITE_DONE && m_status != SQLITE_ROW ){
+            std::cout << "sqlite3_step failed: " << sqlite3_errmsg( m_db ) << std::endl;
+            return result;
+        }
+        
+        char* result_tmp = ( char* )sqlite3_column_blob( stmt, 0 );
+        result = std::string( result_tmp );
+        return result;
     }
 
     int insert_blob( const std::string& uri, int data_type, const std::string& file_path ){
@@ -143,28 +146,16 @@ public:
         return m_status;
     }
 
-    static int callback( void* data, int argc, char** argv, char** azColName ){
-        int i;
-        std::cout << ( const char* )data << std::endl;
-        for( i = 0; i < argc; ++i ){
-            std::string tmp = argv[ i ] ? argv[ i ] : "Null";
-            std::cout << azColName[ i ] << " = " << tmp << std::endl;
-        }
-        return 0;
-    }
+    Db( Db const& ) = delete;
+    void operator=( Db const& ) = delete;
 
-    int exex_db( const std::string& query ){
-        char* error_msg = 0;
-        m_status = sqlite3_exec( m_db, query.c_str(), callback, 0, &error_msg );
-    }
+private:
+    Db(): m_db_name( "test.db" ){}
+    ~Db(){}
 private:
     int m_status;
     sqlite3* m_db;
     std::string m_db_name;
-
-    //zapytania
-    std::string create_data_types;
-    std::string read_blob;
 };
 
 class Tools
@@ -226,6 +217,8 @@ public:
 
         std::string line;
         std::ifstream helpFile( "A1-dziennik.htm" );
+
+        std::string help = Db::getInstance().get_blob( "/help" );
 
         if ( helpFile.is_open() ) {
             while ( std::getline( helpFile, line ) ) {
@@ -614,10 +607,10 @@ int main( int argc, char* argv[] )
     std::cout << "Run example at http://localhost:" << PORT << EXAMPLE_URI << std::endl;
     std::cout << "Exit at http://localhost:" << PORT << EXIT_URI << std::endl;
 
-    Db db( "test.db" );
-    db.open_db();
-    db.create_tables();
-    db.insert_blob( "/help", 1, "c:\\Jopa\\HOME\\Projekty\\sentinel\\build\\A1-dziennik.htm" );
+   
+    Db::getInstance().open_db();
+    Db::getInstance().create_tables();
+    Db::getInstance().insert_blob( "/help", 1, "c:\\Jopa\\HOME\\Projekty\\sentinel\\build\\A1-dziennik.htm" );
 
     while ( !exitNow ) {
 #ifdef _WIN32
@@ -627,7 +620,7 @@ int main( int argc, char* argv[] )
 #endif
     }
 
-    db.close_db();
+    Db::getInstance().close_db();
     std::cout << "Bye!" << std::endl;
 
     return 0;
