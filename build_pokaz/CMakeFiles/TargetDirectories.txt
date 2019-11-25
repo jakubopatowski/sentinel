@@ -1,0 +1,3 @@
+C:/Jopa/HOME/Projekty/sentinel/build_pokaz/CMakeFiles/Sentinel.dir
+C:/Jopa/HOME/Projekty/sentinel/build_pokaz/CMakeFiles/ALL_BUILD.dir
+C:/Jopa/HOME/Projekty/sentinel/build_pokaz/CMakeFiles/ZERO_CHECK.dir

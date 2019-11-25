@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Jopa\HOME\Projekty\sentinel\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Jopa\HOME\Projekty\sentinel\civetweb\CivetServer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Jopa\HOME\Projekty\sentinel\civetweb\civetweb.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Jopa\HOME\Projekty\sentinel\sqlite3\sqlite3.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Jopa\HOME\Projekty\sentinel\civetweb\CivetServer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Jopa\HOME\Projekty\sentinel\civetweb\civetweb.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Jopa\HOME\Projekty\sentinel\sqlite3\sqlite3.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Jopa\HOME\Projekty\sentinel\sqlite3\sqlite3ext.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Jopa\HOME\Projekty\sentinel\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{454B01D7-FA39-3790-AA75-C87EA0E5DADC}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{672936E7-25FD-3E14-AF07-9E0C9DDEF2F2}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

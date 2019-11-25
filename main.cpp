@@ -1,10 +1,3 @@
-/* Copyright (c) 2013-2018 the Civetweb developers
- * Copyright (c) 2013 No Face Press, LLC
- * License http://opensource.org/licenses/mit-license.php MIT License
- */
-
- // Simple example program on how to use Embedded C++ interface.
-
 #include "CivetServer.h"
 #include "sqlite3.h"
 #include <cstring>
@@ -20,7 +13,7 @@
 
 #define DOCUMENT_ROOT "."
 #define PORT "8081"
-#define EXAMPLE_URI "/example"
+#define EXAMPLE_URI "/pomoc"
 #define EXIT_URI "/exit"
 
 
@@ -78,10 +71,10 @@ public:
         return m_status;
     }
 
-    std::string get_blob( const std::string& uri ){
+    std::string get_blob( const std::string& url ){
         std::string result;
         std::string query =
-            "SELECT data FROM HELP where url='" + uri + "';";
+            "SELECT data FROM HELP where url='" + url + "';";
         sqlite3_stmt* stmt;
       
         m_status = sqlite3_prepare_v2( m_db, query.c_str(), -1, &stmt, 0 );
@@ -97,8 +90,33 @@ public:
         }
         
         char* result_tmp = ( char* )sqlite3_column_blob( stmt, 0 );
-        result = std::string( result_tmp );
+        if( NULL != result_tmp ){
+            result = std::string( result_tmp );
+        }
+
         return result;
+    }
+
+    int get_image( const std::string& url, char* data, int& data_size ){
+        std::string query =
+            "SELECT data FROM HELP where url='" + url + "';";
+        sqlite3_stmt* stmt;
+
+        m_status = sqlite3_prepare_v2( m_db, query.c_str(), -1, &stmt, 0 );
+        if( m_status != SQLITE_OK ){
+            std::cout << "sqlite3_prepare_v2 failed: " << sqlite3_errmsg( m_db ) << std::endl;
+            return m_status;
+        }
+
+        m_status = sqlite3_step( stmt );
+        if( m_status != SQLITE_DONE && m_status != SQLITE_ROW ){
+            std::cout << "sqlite3_step failed: " << sqlite3_errmsg( m_db ) << std::endl;
+            return m_status;
+        }
+
+        data = ( char* )sqlite3_column_blob( stmt, 0 );
+        data_size = sqlite3_column_bytes( stmt, 0 );
+        return m_status;
     }
 
     int insert_blob( const std::string& uri, int data_type, const std::string& file_path ){
@@ -161,8 +179,16 @@ private:
 class Tools
 {
 public:
-    static const char* header() {
+    static const char* header_txt() {
         return "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n";
+    }
+
+    static const char* header_image_png(){
+        return "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nConnection: close\r\n\r\n";
+    }
+
+    static const char* header_image_jpeg(){
+        return "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nConnection: close\r\n\r\n";
     }
 };
 
@@ -171,7 +197,7 @@ class ExampleHandler: public CivetHandler
 public:
     bool handleGet( CivetServer* server, struct mg_connection* conn )
     {
-        mg_printf( conn, Tools::header() );
+        mg_printf( conn, Tools::header_txt() );
         mg_printf( conn, "<html><body>\r\n" );
         mg_printf( conn,
                    "<h2>This is an example text from a C++ handler</h2>\r\n" );
@@ -213,19 +239,12 @@ class HelpHandler: public CivetHandler
 public:
     bool handleGet( CivetServer* server, struct mg_connection* conn )
     {
-        mg_printf( conn, Tools::header() );
+        const struct mg_request_info* req_info = mg_get_request_info( conn );
+        std::cout << "URL: " << req_info->request_uri << std::endl;
 
-        std::string line;
-        std::ifstream helpFile( "A1-dziennik.htm" );
-
-        std::string help = Db::getInstance().get_blob( "/help" );
-
-        if ( helpFile.is_open() ) {
-            while ( std::getline( helpFile, line ) ) {
-                mg_printf( conn, line.c_str() );
-                mg_printf( conn, "\r\n" );
-            }
-        }
+        mg_printf( conn, Tools::header_txt() );
+        std::string help = Db::getInstance().get_blob( req_info->request_uri );
+        mg_printf( conn, help.c_str() );
 
         return true;
     }
@@ -237,7 +256,15 @@ public:
     bool handleGet( CivetServer* server, struct mg_connection* conn)
     {
         const struct mg_request_info* req_info = mg_get_request_info( conn );
-        std::cout << req_info->request_uri << std::endl;
+        std::cout << "URL: " << req_info->request_uri << std::endl;
+       
+        mg_printf( conn, Tools::header_image_png() );
+        char* image = NULL;
+        int size = 0;
+        Db::getInstance().get_image( req_info->request_uri, image, size );
+        if( size > 0 ){
+            mg_write( conn, ( const void* )image, size );
+        }
         return true;
     }
 };
@@ -611,6 +638,8 @@ int main( int argc, char* argv[] )
     Db::getInstance().open_db();
     Db::getInstance().create_tables();
     Db::getInstance().insert_blob( "/help", 1, "c:\\Jopa\\HOME\\Projekty\\sentinel\\build\\A1-dziennik.htm" );
+    Db::getInstance().insert_blob( "/A1-dziennik_pliki/image002.png", 1,
+                                   "c:\\Jopa\\HOME\\Projekty\\sentinel\\build\\A1-dziennik_pliki\\image002.png" );
 
     while ( !exitNow ) {
 #ifdef _WIN32
