@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<XMI verified="false" xmi.version="1.2" timestamp="2019-11-27T11:33:02" xmlns:UML="http://schema.omg.org/spec/UML/1.4">
+<XMI verified="false" xmi.version="1.2" timestamp="2019-11-27T12:13:01" xmlns:UML="http://schema.omg.org/spec/UML/1.4">
  <XMI.header>
   <XMI.documentation>
    <XMI.exporter>umbrello uml modeller http://umbrello.kde.org</XMI.exporter>
@@ -44,9 +44,10 @@
        <UML:Classifier.feature>
         <UML:Attribute stereotype="ua2tfcX6ad5ow" visibility="private" isSpecification="false" xmi.id="ucqAWuK6xieb3" type="uKQm5V2lCUEmu" name="id"/>
         <UML:Attribute stereotype="uUAYYt04HWo4U" visibility="private" isSpecification="false" xmi.id="ucuIIp2bbT3oq" type="uTeRK5yDfejxz" name="url"/>
+        <UML:Attribute visibility="private" isSpecification="false" xmi.id="u27LnZQhHmJGs" type="uTeRK5yDfejxz" name="tytuł"/>
         <UML:Attribute visibility="private" isSpecification="false" xmi.id="unTn09FIwV9Ej" type="uUyLRFuEkVBc7" name="blob"/>
-        <UML:Attribute visibility="private" isSpecification="false" xmi.id="ugfxkuEjBVWEa" type="ueQ10oXouepO3" name="type"/>
-        <UML:Attribute visibility="private" isSpecification="false" xmi.id="uzo5HUXfmNdgS" type="uaIWJUqcfrGwE" name="topic"/>
+        <UML:Attribute visibility="private" isSpecification="false" xmi.id="ugfxkuEjBVWEa" type="ueQ10oXouepO3" name="typ"/>
+        <UML:Attribute visibility="private" isSpecification="false" xmi.id="uzo5HUXfmNdgS" type="uaIWJUqcfrGwE" name="temat"/>
        </UML:Classifier.feature>
       </UML:Class>
       <UML:Enumeration stereotype="enum" visibility="public" isSpecification="false" namespace="Logical_View" isAbstract="false" isLeaf="false" isRoot="false" xmi.id="ueQ10oXouepO3" name="baza_pomocy_typ">
@@ -93,7 +94,7 @@
         <UML:Attribute stereotype="ua2tfcX6ad5ow" visibility="private" isSpecification="false" xmi.id="uW97RpWqitNKr" type="uTeRK5yDfejxz" name="appcontext"/>
         <UML:Attribute stereotype="ua2tfcX6ad5ow" visibility="private" isSpecification="false" xmi.id="uN6nI6EMy8LZZ" type="uTeRK5yDfejxz" name="classname"/>
         <UML:Attribute stereotype="ua2tfcX6ad5ow" visibility="private" isSpecification="false" xmi.id="uG4vV67nZfTBm" type="uTeRK5yDfejxz" name="windowtitle"/>
-        <UML:Attribute visibility="private" isSpecification="false" xmi.id="u1hspCciRAX5n" type="uaIWJUqcfrGwE" name="topic"/>
+        <UML:Attribute visibility="private" isSpecification="false" xmi.id="u1hspCciRAX5n" type="uaIWJUqcfrGwE" name="temat"/>
        </UML:Classifier.feature>
       </UML:Class>
      </UML:Namespace.ownedElement>
@@ -113,21 +114,21 @@
            <startpoint startx="-295" starty="-492"/>
            <endpoint endx="-440" endy="-492"/>
           </linepath>
-          <floatingtext linecolor="#ff0000" usesdiagramfillcolor="1" linewidth="0" textcolor="none" usesdiagramusefillcolor="1" x="-434" showstereotype="1" y="-490" text="type" font="Cascadia Code,10,-1,5,50,0,0,0,0,0" localid="ue9UGYTl4khv7" pretext="-" role="710" width="48" isinstance="0" posttext="" usefillcolor="1" fillcolor="none" xmi.id="udQalS5NqcxwA" autoresize="1" height="20"/>
+          <floatingtext linecolor="#ff0000" usesdiagramfillcolor="1" linewidth="0" textcolor="none" usesdiagramusefillcolor="1" x="-434" showstereotype="1" y="-490" text="typ" font="Cascadia Code,10,-1,5,50,0,0,0,0,0" localid="ue9UGYTl4khv7" pretext="-" role="710" width="40" isinstance="0" posttext="" usefillcolor="1" fillcolor="none" xmi.id="udQalS5NqcxwA" autoresize="1" height="20"/>
          </assocwidget>
          <assocwidget linecolor="#ff0000" indexa="1" usesdiagramfillcolor="1" widgetbid="uaIWJUqcfrGwE" indexb="1" linewidth="0" seqnum="" textcolor="none" usesdiagramusefillcolor="1" totalcounta="2" totalcountb="2" widgetaid="u1X6lB8k13O0u" font="Cascadia Code,10,-1,5,50,0,0,0,0,0" visibilityA="1" visibilityB="1" usefillcolor="1" fillcolor="none" changeabilityA="900" xmi.id="uzo5HUXfmNdgS" changeabilityB="900" autoresize="1" type="510">
           <linepath layout="Direct">
            <startpoint startx="-295" starty="-442"/>
            <endpoint endx="-430" endy="-442"/>
           </linepath>
-          <floatingtext linecolor="#ff0000" usesdiagramfillcolor="1" linewidth="0" textcolor="none" usesdiagramusefillcolor="1" x="-424" showstereotype="1" y="-440" text="topic" font="Cascadia Code,10,-1,5,50,0,0,0,0,0" localid="u2iE7uDYFVbIp" pretext="-" role="710" width="56" isinstance="0" posttext="" usefillcolor="1" fillcolor="none" xmi.id="uLi6ahX8MLULE" autoresize="1" height="20"/>
+          <floatingtext linecolor="#ff0000" usesdiagramfillcolor="1" linewidth="0" textcolor="none" usesdiagramusefillcolor="1" x="-424" showstereotype="1" y="-440" text="temat" font="Cascadia Code,10,-1,5,50,0,0,0,0,0" localid="u2iE7uDYFVbIp" pretext="-" role="710" width="56" isinstance="0" posttext="" usefillcolor="1" fillcolor="none" xmi.id="uLi6ahX8MLULE" autoresize="1" height="20"/>
          </assocwidget>
          <assocwidget linecolor="#ff0000" indexa="1" usesdiagramfillcolor="0" widgetbid="uaIWJUqcfrGwE" indexb="1" linewidth="0" seqnum="" textcolor="#000000" usesdiagramusefillcolor="0" totalcounta="2" totalcountb="2" widgetaid="u3aTIQrJBG7dO" font="Cascadia Code,10,-1,5,50,0,0,0,0,0" visibilityA="1" visibilityB="1" usefillcolor="1" fillcolor="#ffff00" changeabilityA="900" xmi.id="u1hspCciRAX5n" changeabilityB="900" autoresize="1" type="510">
           <linepath layout="Direct">
            <startpoint startx="-298" starty="-363"/>
            <endpoint endx="-430" endy="-363"/>
           </linepath>
-          <floatingtext linecolor="#ff0000" usesdiagramfillcolor="1" linewidth="0" textcolor="none" usesdiagramusefillcolor="1" x="-428" showstereotype="1" y="-361" text="topic" font="Cascadia Code,10,-1,5,50,0,0,0,0,0" localid="uIkswFBvagnMo" pretext="-" role="710" width="56" isinstance="0" posttext="" usefillcolor="1" fillcolor="none" xmi.id="uIRti6Jio4pz0" autoresize="1" height="20"/>
+          <floatingtext linecolor="#ff0000" usesdiagramfillcolor="1" linewidth="0" textcolor="none" usesdiagramusefillcolor="1" x="-428" showstereotype="1" y="-361" text="temat" font="Cascadia Code,10,-1,5,50,0,0,0,0,0" localid="uIkswFBvagnMo" pretext="-" role="710" width="56" isinstance="0" posttext="" usefillcolor="1" fillcolor="none" xmi.id="uIRti6Jio4pz0" autoresize="1" height="20"/>
          </assocwidget>
         </associations>
        </diagram>
@@ -251,7 +252,7 @@
   </UML:Model>
  </XMI.content>
  <XMI.extensions xmi.extender="umbrello">
-  <docsettings viewid="uDeJkpSZkO84d" uniqueid="uQcNrzIf6nVxO" documentation=""/>
+  <docsettings viewid="ugeek8pamuMSv" uniqueid="u27LnZQhHmJGs" documentation=""/>
   <listview>
    <listitem open="1" type="800" id="Views">
     <listitem open="1" type="821" id="Component_View">
@@ -273,11 +274,12 @@
       <listitem open="0" type="815" id="urEvzDTkTendl"/>
      </listitem>
      <listitem open="0" type="807" id="ugeek8pamuMSv" label="Baza pomocy"/>
-     <listitem open="0" type="813" id="u1X6lB8k13O0u">
+     <listitem open="1" type="813" id="u1X6lB8k13O0u">
       <listitem open="0" type="814" id="unTn09FIwV9Ej"/>
       <listitem open="0" type="814" id="ucqAWuK6xieb3"/>
       <listitem open="0" type="814" id="uzo5HUXfmNdgS"/>
       <listitem open="0" type="814" id="ugfxkuEjBVWEa"/>
+      <listitem open="0" type="814" id="u27LnZQhHmJGs"/>
       <listitem open="0" type="814" id="ucuIIp2bbT3oq"/>
      </listitem>
      <listitem open="1" type="813" id="u3aTIQrJBG7dO">

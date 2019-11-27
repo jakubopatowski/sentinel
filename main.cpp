@@ -114,8 +114,11 @@ public:
             return m_status;
         }
 
-        data = ( char* )sqlite3_column_blob( stmt, 0 );
         data_size = sqlite3_column_bytes( stmt, 0 );
+        if( data_size > 0 ){
+            char* tmp = ( char* )sqlite3_column_blob( stmt, 0 );
+            memcpy( data, tmp, data_size );
+        }
         return m_status;
     }
 
