@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<XMI verified="false" xmi.version="1.2" timestamp="2019-11-27T12:13:01" xmlns:UML="http://schema.omg.org/spec/UML/1.4">
+<XMI verified="false" xmi.version="1.2" timestamp="2019-11-28T11:33:00" xmlns:UML="http://schema.omg.org/spec/UML/1.4">
  <XMI.header>
   <XMI.documentation>
    <XMI.exporter>umbrello uml modeller http://umbrello.kde.org</XMI.exporter>
@@ -91,9 +91,9 @@
       </UML:Class>
       <UML:Class visibility="public" isSpecification="false" namespace="Logical_View" isAbstract="false" isLeaf="false" isRoot="false" xmi.id="u3aTIQrJBG7dO" name="baza_pomocy_kontekst">
        <UML:Classifier.feature>
-        <UML:Attribute stereotype="ua2tfcX6ad5ow" visibility="private" isSpecification="false" xmi.id="uW97RpWqitNKr" type="uTeRK5yDfejxz" name="appcontext"/>
-        <UML:Attribute stereotype="ua2tfcX6ad5ow" visibility="private" isSpecification="false" xmi.id="uN6nI6EMy8LZZ" type="uTeRK5yDfejxz" name="classname"/>
-        <UML:Attribute stereotype="ua2tfcX6ad5ow" visibility="private" isSpecification="false" xmi.id="uG4vV67nZfTBm" type="uTeRK5yDfejxz" name="windowtitle"/>
+        <UML:Attribute stereotype="ua2tfcX6ad5ow" visibility="private" isSpecification="false" xmi.id="uW97RpWqitNKr" type="uTeRK5yDfejxz" name="window_id"/>
+        <UML:Attribute stereotype="ua2tfcX6ad5ow" visibility="private" isSpecification="false" xmi.id="uN6nI6EMy8LZZ" type="uTeRK5yDfejxz" name="klasa_okna"/>
+        <UML:Attribute stereotype="ua2tfcX6ad5ow" visibility="private" isSpecification="false" xmi.id="uG4vV67nZfTBm" type="uTeRK5yDfejxz" name="tytuł_okna"/>
         <UML:Attribute visibility="private" isSpecification="false" xmi.id="u1hspCciRAX5n" type="uaIWJUqcfrGwE" name="temat"/>
        </UML:Classifier.feature>
       </UML:Class>
@@ -283,10 +283,10 @@
       <listitem open="0" type="814" id="ucuIIp2bbT3oq"/>
      </listitem>
      <listitem open="1" type="813" id="u3aTIQrJBG7dO">
-      <listitem open="0" type="814" id="uW97RpWqitNKr"/>
       <listitem open="0" type="814" id="uN6nI6EMy8LZZ"/>
       <listitem open="0" type="814" id="u1hspCciRAX5n"/>
       <listitem open="0" type="814" id="uG4vV67nZfTBm"/>
+      <listitem open="0" type="814" id="uW97RpWqitNKr"/>
      </listitem>
      <listitem open="0" type="831" id="uaIWJUqcfrGwE">
       <listitem open="0" type="839" id="um4cFcxMCFAZI"/>

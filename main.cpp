@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include "boost/filesystem.hpp"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -97,7 +98,7 @@ public:
         return result;
     }
 
-    int get_image( const std::string& url, char* data, int& data_size ){
+    int get_image( const std::string& url, std::vector<char>& data, int& data_size ){
         std::string query =
             "SELECT data FROM HELP where url='" + url + "';";
         sqlite3_stmt* stmt;
@@ -116,8 +117,10 @@ public:
 
         data_size = sqlite3_column_bytes( stmt, 0 );
         if( data_size > 0 ){
-            char* tmp = ( char* )sqlite3_column_blob( stmt, 0 );
-            memcpy( data, tmp, data_size );
+            std::vector<char> tmp( data_size );
+            const char* pBuffer = reinterpret_cast< const char* >( sqlite3_column_blob( stmt, 0 ) );
+            std::copy( pBuffer, pBuffer + tmp.size(), &tmp[ 0 ] );
+            data = tmp;
         }
         return m_status;
     }
@@ -193,6 +196,16 @@ public:
     static const char* header_image_jpeg(){
         return "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nConnection: close\r\n\r\n";
     }
+
+    static void list_files(){
+        boost::filesystem::path p( "c:\\Jopa\\HOME\\Projekty\\sentinel\\help" );
+        boost::filesystem::directory_iterator end_itr;
+
+        for( boost::filesystem::directory_iterator itr( p ); itr != end_itr; ++itr ){
+            std::string file = itr->path().string();
+            std::cout << file << std::endl;
+        }
+    }
 };
 
 class ExampleHandler: public CivetHandler
@@ -262,11 +275,11 @@ public:
         std::cout << "URL: " << req_info->request_uri << std::endl;
        
         mg_printf( conn, Tools::header_image_png() );
-        char* image = NULL;
+        std::vector<char> image;
         int size = 0;
         Db::getInstance().get_image( req_info->request_uri, image, size );
         if( size > 0 ){
-            mg_write( conn, ( const void* )image, size );
+            mg_write( conn, reinterpret_cast< char* >( image.data() ), size );
         }
         return true;
     }

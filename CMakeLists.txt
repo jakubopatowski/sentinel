@@ -45,7 +45,7 @@ elseif(MSVC)
   set(BOOST_ROOT               "c:/Jopa/HOME/Projekty/boost/boost_1_69_0")
 endif()
 
-find_package(Boost REQUIRED COMPONENTS date_time)
+find_package(Boost REQUIRED COMPONENTS date_time filesystem)
 
 message("==============================================================")
 message("                        ..:: BOOST ::..                       ")
