@@ -1,6 +1,7 @@
 #include "CivetServer.h"
 #include "sqlite3.h"
 #include <cstring>
+#include <unordered_set>
 #include <set>
 #include <iostream>
 #include <string>
@@ -23,6 +24,8 @@ using namespace std;
 
 /* Exit flag for main loop */
 volatile bool exitNow = false;
+
+enum class ContentType{ None, Page, Image_png, Image_jpg, Image_gif };
 
 class Db{
 public:
@@ -75,8 +78,7 @@ public:
         return m_status;
     }
 
-    std::string get_blob( const std::string& url ){
-        std::string result;
+    int get_page( const std::string& url, string& page ){
         std::string query =
             "SELECT data FROM HELP where url='" + url + "';";
         sqlite3_stmt* stmt;
@@ -84,26 +86,26 @@ public:
         m_status = sqlite3_prepare_v2( m_db, query.c_str(), -1, &stmt, 0 );
         if( m_status != SQLITE_OK ){
             std::cout << "sqlite3_prepare_v2 failed: " << sqlite3_errmsg( m_db ) << std::endl;
-            return result;
+            return m_status;
         }
       
         m_status = sqlite3_step( stmt );
         if( m_status != SQLITE_DONE && m_status != SQLITE_ROW ){
             std::cout << "sqlite3_step failed: " << sqlite3_errmsg( m_db ) << std::endl;
-            return result;
+            return m_status;
         }
         
         char* result_tmp = ( char* )sqlite3_column_blob( stmt, 0 );
         if( NULL != result_tmp ){
-            result = std::string( result_tmp );
+            page = std::string( result_tmp );
         }
 
-        return result;
+        return m_status;
     }
 
-    int get_image( const std::string& url, std::vector<char>& data, int& data_size ){
+    int get_image( const std::string& url, std::vector<char>& data, int& data_size, ContentType& type){
         std::string query =
-            "SELECT data FROM HELP where url='" + url + "';";
+            "SELECT data, data_type FROM HELP where url='" + url + "';";
         sqlite3_stmt* stmt;
 
         m_status = sqlite3_prepare_v2( m_db, query.c_str(), -1, &stmt, 0 );
@@ -125,6 +127,10 @@ public:
             std::copy( pBuffer, pBuffer + tmp.size(), &tmp[ 0 ] );
             data = tmp;
         }
+
+        type = static_cast< ContentType >( sqlite3_column_int( stmt, 1 ) );
+        m_status = sqlite3_finalize( stmt );
+
         return m_status;
     }
 
@@ -185,8 +191,6 @@ private:
     std::string m_db_name;
 };
 
-enum class ContentType{ None, Page, Image_png, Image_jpg, Image_gif };
-
 struct Content{
 
     string url;
@@ -232,8 +236,8 @@ public:
         return result;
     }
 
-    static set<Content> list_to_compile( const path& root, const set<path>& files ){
-        set<Content> result;
+    static vector<Content> list_to_compile( const path& root, const set<path>& files ){
+        vector<Content> result;
 
         for( auto file : files ){
             Content tmp;
@@ -257,6 +261,8 @@ public:
             else{
                 tmp.type = ContentType::None;
             }
+
+            result.push_back( tmp );
         }
 
         return result;
@@ -314,8 +320,9 @@ public:
         std::cout << "URL: " << req_info->request_uri << std::endl;
 
         mg_printf( conn, Tools::header_txt() );
-        std::string help = Db::getInstance().get_blob( req_info->request_uri );
-        mg_printf( conn, help.c_str() );
+        string page;
+        Db::getInstance().get_page( req_info->request_uri, page );
+        mg_printf( conn, page.c_str() );
 
         return true;
     }
@@ -329,10 +336,21 @@ public:
         const struct mg_request_info* req_info = mg_get_request_info( conn );
         std::cout << "URL: " << req_info->request_uri << std::endl;
        
-        mg_printf( conn, Tools::header_image_png() );
         std::vector<char> image;
         int size = 0;
-        Db::getInstance().get_image( req_info->request_uri, image, size );
+        ContentType type = ContentType::None;
+        Db::getInstance().get_image( req_info->request_uri, image, size, type);
+        
+        if( type == ContentType::Image_jpg ){
+            mg_printf( conn, Tools::header_image_jpeg() );
+        }
+        else if( type == ContentType::Image_png ){
+            mg_printf( conn, Tools::header_image_png() );
+        }
+        else{
+            return true;
+        }
+  
         if( size > 0 ){
             mg_write( conn, reinterpret_cast< char* >( image.data() ), size );
         }
