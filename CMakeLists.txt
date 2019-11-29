@@ -34,7 +34,7 @@ set(project_headers
 #=====================
 
 # set boost includes
-set(Boost_USE_STATIC_LIBS      OFF)  # only find static libs
+set(Boost_USE_STATIC_LIBS      ON)  # only find static libs
 set(Boost_USE_DEBUG_LIBS       ON)   # ignore debug libs and
 set(Boost_USE_RELEASE_LIBS     OFF)  # only find release libs
 set(Boost_USE_MULTITHREADED    ON)
@@ -42,10 +42,10 @@ set(Boost_USE_STATIC_RUNTIME   OFF)
 if(UNIX)
   set(BOOST_LIBRARYDIR         "/usr/lib64")
 elseif(MSVC)
-  set(BOOST_ROOT               "c:/Jopa/HOME/Projekty/boost/boost_1_69_0")
+  set(BOOST_ROOT               "c:/Jopa/HOME/Projekty/boost/boost_1_71_0")
 endif()
 
-find_package(Boost REQUIRED COMPONENTS date_time filesystem)
+find_package(Boost REQUIRED COMPONENTS filesystem)
 
 message("==============================================================")
 message("                        ..:: BOOST ::..                       ")

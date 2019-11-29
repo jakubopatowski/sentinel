@@ -1,6 +1,7 @@
 #include "CivetServer.h"
 #include "sqlite3.h"
 #include <cstring>
+#include <set>
 #include <iostream>
 #include <string>
 #include <fstream>
@@ -17,6 +18,8 @@
 #define EXAMPLE_URI "/pomoc"
 #define EXIT_URI "/exit"
 
+using namespace boost::filesystem;
+using namespace std;
 
 /* Exit flag for main loop */
 volatile bool exitNow = false;
@@ -182,10 +185,18 @@ private:
     std::string m_db_name;
 };
 
-class Tools
-{
+enum class ContentType{ None, Page, Image_png, Image_jpg, Image_gif };
+
+struct Content{
+
+    string url;
+    path path;
+    ContentType type;
+};
+
+class Tools{
 public:
-    static const char* header_txt() {
+    static const char* header_txt(){
         return "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n";
     }
 
@@ -197,14 +208,58 @@ public:
         return "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nConnection: close\r\n\r\n";
     }
 
-    static void list_files(){
-        boost::filesystem::path p( "c:\\Jopa\\HOME\\Projekty\\sentinel\\help" );
-        boost::filesystem::directory_iterator end_itr;
+    static set<path> list_files( const path& dir ){
+        static set<path> result;
+        static set<string> file_to_blob_filter{ ".htm", ".html", ".jpeg", ".jpg", ".png", ".gif" };
 
-        for( boost::filesystem::directory_iterator itr( p ); itr != end_itr; ++itr ){
-            std::string file = itr->path().string();
-            std::cout << file << std::endl;
+        directory_iterator end_itr;
+
+        for( directory_iterator itr( dir ); itr != end_itr; ++itr ){
+            if( is_regular_file( itr->path() ) ){
+                set<string>::const_iterator is_ok = file_to_blob_filter.end();
+                is_ok = file_to_blob_filter.find( itr->path().extension().string() );
+                if( is_ok != file_to_blob_filter.end() ){
+                    string file = itr->path().string();
+                    cout << file << endl;
+                    result.insert( itr->path() );
+                }
+            }
+            else if( is_directory( itr->path() ) ){
+                list_files( itr->path() );
+            }
         }
+
+        return result;
+    }
+
+    static set<Content> list_to_compile( const path& root, const set<path>& files ){
+        set<Content> result;
+
+        for( auto file : files ){
+            Content tmp;
+            tmp.path = file;
+            tmp.url = "/" + relative( tmp.path, root ).generic_string();
+            
+            if( file.extension() == ".png" ){
+                tmp.type = ContentType::Image_png;
+            }
+            else if( file.extension() == ".jpg" ||
+                     file.extension() == ".jpeg" ){
+                tmp.type = ContentType::Image_jpg;
+            }
+            else if( file.extension() == ".gif" ){
+                tmp.type = ContentType::Image_gif;
+            }
+            else if( file.extension() == ".html" ||
+                     file.extension() == ".htm" ){
+                tmp.type = ContentType::Page;
+            }
+            else{
+                tmp.type = ContentType::None;
+            }
+        }
+
+        return result;
     }
 };
 
@@ -596,7 +651,7 @@ int main( int argc, char* argv[] )
     const char* options[] = {
         "document_root", DOCUMENT_ROOT, "listening_ports", PORT, 0 };
 
-    std::vector<std::string> cpp_options;
+    vector<string> cpp_options;
     for ( int i = 0; i < ( sizeof( options ) / sizeof( options[ 0 ] ) - 1 ); i++ ) {
         cpp_options.push_back( options[ i ] );
     }
@@ -624,6 +679,7 @@ int main( int argc, char* argv[] )
     ImageHandler h_image;
     server.addHandler( "**.png", h_image );
     server.addHandler( "**.jpg", h_image );
+    server.addHandler( "**.gif", h_image );
 
 #ifdef NO_FILES
     /* This handler will handle "everything else", including
@@ -649,13 +705,22 @@ int main( int argc, char* argv[] )
 #endif
     std::cout << "Run example at http://localhost:" << PORT << EXAMPLE_URI << std::endl;
     std::cout << "Exit at http://localhost:" << PORT << EXIT_URI << std::endl;
-
-   
+    
     Db::getInstance().open_db();
     Db::getInstance().create_tables();
-    Db::getInstance().insert_blob( "/help", 1, "c:\\Jopa\\HOME\\Projekty\\sentinel\\build\\A1-dziennik.htm" );
-    Db::getInstance().insert_blob( "/A1-dziennik_pliki/image002.png", 1,
-                                   "c:\\Jopa\\HOME\\Projekty\\sentinel\\build\\A1-dziennik_pliki\\image002.png" );
+
+    path help_dir( "c:\\Jopa\\HOME\\Projekty\\sentinel\\help" );
+    auto files = Tools::list_files( help_dir );
+    auto content = Tools::list_to_compile( help_dir, files );
+    for( auto item : content ){
+        cout << "£adowanie do bazy: " << endl;
+        cout << "url: " << item.url << endl;
+        cout << "file: " << item.path << endl;
+        cout << "type: " << static_cast< int >( item.type ) << endl;
+
+        Db::getInstance().insert_blob( item.url, static_cast< int >( item.type ), 
+                                       item.path.string() );
+    }
 
     while ( !exitNow ) {
 #ifdef _WIN32
