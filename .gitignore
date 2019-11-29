@@ -36,7 +36,8 @@
 .#*
 
 # Directories
-build*
+*build*
+*build_*
 *cppcheck*
 .ccls-cache
 .cquery_cached_index
