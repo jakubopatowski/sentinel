@@ -99,11 +99,38 @@ public:
         if( NULL != result_tmp ){
             page = std::string( result_tmp );
         }
-
+        sqlite3_finalize( stmt );
         return m_status;
     }
 
-    int get_image( const std::string& url, std::vector<char>& data, int& data_size, ContentType& type){
+    int get_all_urls( const ContentType& type, std::vector<std::string>& urls )
+    {
+        std::string query =
+            "SELECT url FROM help WHERE data_type=" + to_string( static_cast< int >( type ) ) + ";";
+        sqlite3_stmt* stmt;
+
+        m_status = sqlite3_prepare_v2( m_db, query.c_str(), -1, &stmt, 0 );
+        if( m_status != SQLITE_OK ){
+            std::cout << "sqlite3_prepare_v2 failed: " << sqlite3_errmsg( m_db ) << std::endl;
+            return m_status;
+        }
+
+        m_status = sqlite3_step( stmt );
+        while( m_status == SQLITE_ROW ){
+            std::string tmp = ( const char* )sqlite3_column_text( stmt, 0 );
+            urls.push_back( tmp );
+            m_status = sqlite3_step( stmt );
+        }
+        if( m_status != SQLITE_DONE && m_status != SQLITE_ROW ){
+            std::cout << "sqlite3_step failed: " << sqlite3_errmsg( m_db ) << std::endl;
+            return m_status;
+        }
+
+        sqlite3_finalize( stmt );
+        return m_status;
+    }
+
+    int get_content( const std::string& url, std::vector<char>& data, int& data_size, ContentType& type){
         std::string query =
             "SELECT data, data_type FROM HELP where url='" + url + "';";
         sqlite3_stmt* stmt;
@@ -274,8 +301,18 @@ class ExampleHandler: public CivetHandler
 public:
     bool handleGet( CivetServer* server, struct mg_connection* conn )
     {
+        std::vector<std::string> pages;
+        Db::getInstance().get_all_urls( ContentType::Page, pages );
+
         mg_printf( conn, Tools::header_txt() );
         mg_printf( conn, "<html><body>\r\n" );
+
+        for( auto& page : pages ){
+            std::string entry = "<p>" + page + ": <a "
+                "href=\"" + page.c_str() + "\">link</a></p>\r\n";
+            mg_printf( conn, entry.c_str() );
+        }
+
         mg_printf( conn,
                    "<h2>This is an example text from a C++ handler</h2>\r\n" );
         mg_printf( conn,
@@ -311,24 +348,7 @@ public:
     }
 };
 
-class HelpHandler: public CivetHandler
-{
-public:
-    bool handleGet( CivetServer* server, struct mg_connection* conn )
-    {
-        const struct mg_request_info* req_info = mg_get_request_info( conn );
-        std::cout << "URL: " << req_info->request_uri << std::endl;
-
-        mg_printf( conn, Tools::header_txt() );
-        string page;
-        Db::getInstance().get_page( req_info->request_uri, page );
-        mg_printf( conn, page.c_str() );
-
-        return true;
-    }
-};
-
-class ImageHandler: public CivetHandler
+class ContentHandler: public CivetHandler
 {
 public:
     bool handleGet( CivetServer* server, struct mg_connection* conn)
@@ -336,24 +356,24 @@ public:
         const struct mg_request_info* req_info = mg_get_request_info( conn );
         std::cout << "URL: " << req_info->request_uri << std::endl;
        
-        std::vector<char> image;
+        std::vector<char> content;
         int size = 0;
         ContentType type = ContentType::None;
-        Db::getInstance().get_image( req_info->request_uri, image, size, type);
+        Db::getInstance().get_content( req_info->request_uri, content, size, type);
         
         if( type == ContentType::Image_jpg ){
             mg_printf( conn, Tools::header_image_jpeg() );
+            mg_write( conn, reinterpret_cast< char* >( content.data() ), size );
         }
         else if( type == ContentType::Image_png ){
             mg_printf( conn, Tools::header_image_png() );
+            mg_write( conn, reinterpret_cast< char* >( content.data() ), size );
         }
-        else{
-            return true;
+        else if (type == ContentType::Page) {
+            mg_printf( conn, Tools::header_txt() );
+            mg_printf( conn, reinterpret_cast< char* >( &content[ 0 ] ) );
         }
-  
-        if( size > 0 ){
-            mg_write( conn, reinterpret_cast< char* >( image.data() ), size );
-        }
+ 
         return true;
     }
 };
@@ -691,13 +711,8 @@ int main( int argc, char* argv[] )
     WsStartHandler h_ws;
     server.addHandler( "/ws", h_ws );
 
-    HelpHandler h_help;
-    server.addHandler( "/help", h_help );
-
-    ImageHandler h_image;
-    server.addHandler( "**.png", h_image );
-    server.addHandler( "**.jpg", h_image );
-    server.addHandler( "**.gif", h_image );
+    ContentHandler h_content;
+    server.addHandler( "**", h_content );
 
 #ifdef NO_FILES
     /* This handler will handle "everything else", including
