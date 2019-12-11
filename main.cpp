@@ -6,13 +6,17 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include <thread>
+#include <chrono>
 #include "boost/filesystem.hpp"
+#include "boost/regex.hpp"
+#include "rdb.hpp"
+#include "rdblob.hpp"
+#include "rsystem.hpp"
+#include "roptions.hpp"
 
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
+#define DB_CONFIG_FILE_PATH "/ini/netsystem.ini"
+#define SERVICE_CONFIG_FILE_PATH "/ini/rvs_help.ini"
 
 #define DOCUMENT_ROOT "."
 #define PORT "8081"
@@ -27,14 +31,310 @@ volatile bool exitNow = false;
 
 enum class ContentType{ None, Page, Image_png, Image_jpg, Image_gif };
 
-class Db{
+struct Configuration{
+    std::string connectionString;
+    std::string user;
+    std::string host;
+    std::string pass;
+};
+
+void ReadDbConfig( Configuration& config ){
+    // Zaczytanie pliku konfiguracyjnego
+    QString configFileName( RSystem::getActiveProject() + DB_CONFIG_FILE_PATH );
+    ROptions configManager( configFileName, "" );
+
+    config.user = configManager.get( QString::null, "dbusr" ).ascii();
+    config.host = configManager.get( QString::null, "s.1.dbname" ).ascii();
+    config.pass = configManager.get( QString::null, "dbpwd" ).ascii();
+
+    config.connectionString = config.user + "/" + config.pass + "@" + config.host;
+}
+
+class IDb{
 public:
-    static Db& getInstance(){
-        static Db instance;
+    virtual int open_db( const std::string& connection_str ) = 0;
+    virtual int close_db() = 0;
+    virtual int create_tables() = 0;
+    virtual int get_content( const std::string& url, std::vector<char>& data, int& data_size, ContentType& type ) = 0;
+    virtual int put_content( const std::string& uri, int data_type, const std::string& topic, const std::string& file_path ) = 0;
+    virtual int get_all_urls( const ContentType& type, std::vector<std::string>& urls ) = 0;
+
+protected:
+    IDb(): create_help( "CREATE TABLE baza_pomocy_dane("
+                        "id INTEGER NOT NULL,"
+                        "url VARCHAR(1024) NOT NULL,"
+                        "tytul VARCHAR(1024),"
+                        "temat INT,"
+                        "typ INT NOT NULL,"
+                        "dane BLOB NOT NULL,"
+                        "PRIMARY KEY (id),"
+                        "UNIQUE(url))" ),
+        create_help_seq( "CREATE SEQUENCE baza_pomocy_dane_seq "
+                         "START WITH 1 INCREMENT BY 1 NOMAXVALUE NOMINVALUE "
+                         "NOCYCLE NOCACHE ORDER" ),
+        create_help_trg( "CREATE OR REPLACE TRIGGER baza_pomocy_dane_trg BEFORE INSERT ON baza_pomocy_dane\n"
+                         "FOR EACH ROW\n"
+                         "BEGIN\n"
+                         "  IF :NEW.id IS NULL THEN\n"
+                         "    SELECT baza_pomocy_dane_seq.NEXTVAL INTO :NEW.id FROM dual;\n"
+                         "  END IF;\n"
+                         "END;" ),
+        create_topic( "CREATE TABLE baza_pomocy_temat("
+                      "id INTEGER NOT NULL,"
+                      "temat VARCHAR(1024) NOT NULL,"
+                      "PRIMARY KEY (id),"
+                      "UNIQUE(temat))" ),
+        create_topic_seq( "CREATE SEQUENCE baza_pomocy_temat_seq "
+                          "START WITH 1 INCREMENT BY 1 NOMAXVALUE NOMINVALUE "
+                          "NOCYCLE NOCACHE ORDER" ),
+        create_topic_trg( "CREATE OR REPLACE TRIGGER baza_pomocy_temat_trg BEFORE INSERT ON baza_pomocy_temat\n"
+                          "FOR EACH ROW\n"
+                          "BEGIN\n"
+                          "  IF :NEW.id IS NULL THEN\n"
+                          "    SELECT baza_pomocy_temat_seq.NEXTVAL INTO :NEW.id FROM dual;\n"
+                          "  END IF;\n"
+                          "END;" ),
+        get_data( "SELECT dane, typ FROM BAZA_POMOCY_DANE "
+                  "where url=:url<char[1024]>" ),
+                  //"where title is not null" ),
+        put_data( "insert into baza_pomocy_dane(url, typ, temat, dane) "
+                  "values(:url<char[1024]>,:data_type<int>,:topic<char[1024]>,empty_blob()) "
+                  "returning dane into :blob_data<blob>" ),
+        get_urls( "SELECT url FROM baza_pomocy_dane WHERE typ=:data_type<int>" ),
+        get_topic_id( "select id from baza_pomocy_temat where temat=:temat<char[1024]>" ),
+        get_data_by_topic( "select url, typ from baza_pomocy_dane where temat=:temat<int>" ){}
+
+    std::string create_help;
+    std::string create_help_seq;
+    std::string create_help_trg;
+    std::string create_topic;
+    std::string create_topic_seq;
+    std::string create_topic_trg;
+    std::string get_data;
+    std::string put_data;
+    std::string get_urls;
+    std::string get_topic_id;
+    std::string get_data_by_topic;
+};
+
+class DbOracle: public IDb{
+public:
+
+    static DbOracle& getInstance(){
+        static DbOracle instance;
         return instance;
     }
 
-    int open_db(){
+    virtual int open_db( const std::string& connection_str ){
+        QString tmp( connection_str.c_str() );
+        cout << "Connecting to: " << connection_str << endl;
+        
+        try{
+            m_db = unique_ptr<RDb>( new RDb( RDb::ORACLE_U ) );
+            m_db->logon( tmp );
+        }
+        catch( RDbException & exc ){
+            cout << "RDbException EXCEPTION !!!: " << exc.message.ascii() << endl;
+        }
+        catch( ... ){
+            cout << "UNKNOWN EXCEPTION !!!" << endl;
+        }
+
+        return 0;
+    }
+
+    virtual int close_db(){
+        m_db->logoff();
+        return 0;
+    }
+
+    int run_query( const std::string& query ){
+        try{
+            RDbStream dbs( *m_db );
+            dbs.open( 1, query.c_str() );
+        }
+        catch( RDbException & exc ){
+            cout << "RDbException EXCEPTION !!!: " << endl;
+            cout << "    " << query << endl;
+            cout << "    " << exc.message.ascii() << endl;
+        }
+        catch( ... ){
+            cout << "UNKNOWN EXCEPTION !!!" << endl;
+            cout << "    " << query << endl;
+        }
+
+        return 0;
+    }
+
+    virtual int create_tables(){
+        DbOracle::getInstance().run_query( create_help );
+        DbOracle::getInstance().run_query( create_help_seq );
+        DbOracle::getInstance().run_query( create_help_trg );
+
+        DbOracle::getInstance().run_query( create_topic );
+        DbOracle::getInstance().run_query( create_topic_seq );
+        DbOracle::getInstance().run_query( create_topic_trg );
+
+        DbOracle::getInstance().run_query( "insert into baza_pomocy_temat (temat) values ('dziennik')" );
+        DbOracle::getInstance().run_query( "insert into baza_pomocy_temat (temat) values ('mapa')" );
+        DbOracle::getInstance().run_query( "insert into baza_pomocy_temat (temat) values ('lista_stanow')" );
+        DbOracle::getInstance().run_query( "insert into baza_pomocy_temat (temat) values ('przekazanie_zmiany')" );
+        DbOracle::getInstance().run_query( "insert into baza_pomocy_temat (temat) values ('lista_ostrzegawcza')" );
+
+        return 0;
+    }
+
+    virtual int get_content( const std::string& url, std::vector<char>& data, int& data_size, ContentType& type ){
+        QString url_tmp( url.c_str() );
+        QString query( get_data.c_str() );
+        BlobInputStream data_tmp;
+        std::string blob_tmp;
+        int type_tmp;
+
+        try{
+            RDbStream dbs( *m_db );
+            dbs.open( 1, query );
+            dbs << url_tmp;
+            if( dbs.eof() ){
+                cout << "Nie ma urla: " << url << endl;
+                return 1;
+            }
+            dbs >> data_tmp;
+            dbs >> type_tmp;
+            data_tmp.readAll( blob_tmp );
+            data_tmp.close();
+            dbs.flush();
+        }
+        catch( RDbException & exc ){
+            cout << "RDbException EXCEPTION !!!" << endl;
+            cout << "message: " << exc.message.toStdString() << endl;
+            cout << "statement: " << exc.statement.toStdString() << endl;
+            cout << "sqlstate: " << exc.sqlstate.toStdString() << endl;
+        }
+        catch( ... ){
+            cout << "UNKNOWN EXCEPTION !!!" << endl;
+        }
+        
+        std::vector<char> blob( blob_tmp.begin(), blob_tmp.end() );
+        data = blob;
+        data_size = blob.size();
+        type = static_cast< ContentType >( type_tmp );
+
+        return 0;
+    }
+
+    virtual int put_content( const std::string& url, 
+                             int data_type,
+                             const std::string& topic,
+                             const std::string& file_path ){
+        
+        std::ifstream file( file_path, std::ios::in | std::ios::binary );
+        if( !file ){
+            std::cout << "Nie mo¿na otworzyæ pliku! " << std::endl;
+            return 1;
+        }
+        file.seekg( 0, std::ifstream::end );
+        std::streampos size = file.tellg();
+        file.seekg( 0 );
+
+        char* buffer = new char[ size ];
+        file.read( buffer, size );
+
+        QString query( put_data.c_str() );
+        QString url_tmp( url.c_str() );
+
+        try{
+            RDbStream rdb( *m_db );
+            rdb.open( 1, query, RDbStream::LOB_WRITING );
+            BlobOutputStream blob;
+            rdb << url_tmp;
+            rdb << data_type;
+            rdb << topic;
+            rdb << blob;
+            blob.write( buffer, size );
+            blob.close();
+            rdb.flush();
+        }
+        catch( RDbException & exc ){
+            cout << "RDbException EXCEPTION !!!: " << exc.message.ascii() << endl;
+        }
+        catch( ... ){
+            cout << "UNKNOWN EXCEPTION !!!" << endl;
+        }
+
+        return 0;
+    }
+
+    virtual int get_all_urls( const ContentType& type, std::vector<std::string>& urls ){
+        try{
+            RDbStream dbs( *m_db );
+            dbs.open( 1, get_urls.c_str() );
+            dbs << static_cast< int >( type );
+            QString url_tmp;
+            while( dbs.eof() ){
+                dbs >> url_tmp;
+                urls.push_back( url_tmp.toStdString() );
+            }
+        }
+        catch( RDbException & exc ){
+            cout << "RDbException EXCEPTION !!!: " << exc.message.ascii() << endl;
+        }
+        catch( ... ){
+            cout << "UNKNOWN EXCEPTION !!!" << endl;
+        }
+
+        return 0;
+    }
+
+    int get_content_by_topic( const std::string& url, std::vector<std::string>& content_list ){
+        QString topic( url.c_str() );
+        int topic_id = 0;
+        
+        QString url_tmp;
+        int type_tmp;
+
+        try{
+            RDbStream dbs( *m_db );
+            dbs.open( 1, get_topic_id.c_str() );
+            dbs << topic;
+            if( !dbs.eof() ){
+                dbs >> topic_id;
+            }
+
+            dbs.flush();
+
+            dbs.open( 1, get_data_by_topic.c_str() );
+            dbs << topic_id;
+            while( !dbs.eof() ){
+                dbs >> url_tmp;
+                dbs >> type_tmp;
+                auto type = static_cast< ContentType >( type_tmp );
+                if( type == ContentType::Page ){
+                    content_list.push_back( url_tmp.toStdString() );
+                }
+            }
+        }
+        catch( RDbException & exc ){
+            cout << "RDbException EXCEPTION !!!: " << exc.message.ascii() << endl;
+        }
+        catch( ... ){
+            cout << "UNKNOWN EXCEPTION !!!" << endl;
+        }
+        return 0;
+    }
+
+private:
+    std::unique_ptr<RDb> m_db;
+};
+
+class DbSqlite3: public IDb{
+public:
+    static DbSqlite3& getInstance(){
+        static DbSqlite3 instance;
+        return instance;
+    }
+
+    virtual int open_db( const std::string& connection_str ){
         m_status = sqlite3_open( m_db_name.c_str(), &m_db );
         if( m_status ){
             std::cout << "Nie mo¿na nawi¹zaæ po³¹czenia z baz¹ "
@@ -53,19 +353,13 @@ public:
         return m_status;
     }
 
-    int close_db(){
+    virtual int close_db(){
         m_status = sqlite3_close( m_db );
         std::cout << "Zamkniêto po³¹czenie z baz¹ " << m_db_name << std::endl;
         return m_status;
     }
 
-    int create_tables(){
-        std::string create_help =
-            "CREATE TABLE HELP("
-            "URL TEXT UNIQUE NOT NULL, "
-            "DATA_TYPE INT NOT NULL, "
-            "DATA BLOB NOT NULL);";
-
+    virtual int create_tables(){
         char* errmsg;
         m_status = sqlite3_exec( m_db, create_help.c_str(), NULL, 0, &errmsg );
         if( m_status != SQLITE_OK ){
@@ -161,7 +455,7 @@ public:
         return m_status;
     }
 
-    int insert_blob( const std::string& uri, int data_type, const std::string& file_path ){
+    virtual int put_content( const std::string& uri, int data_type, const std::string& topic, const std::string& file_path ){
         std::ifstream file( file_path, std::ios::in | std::ios::binary );
         if( !file ){
             std::cout << "Nie mo¿na otworzyæ pliku! " << std::endl;
@@ -206,12 +500,12 @@ public:
         return m_status;
     }
 
-    Db( Db const& ) = delete;
-    void operator=( Db const& ) = delete;
+    DbSqlite3( DbSqlite3 const& ) = delete;
+    void operator=( DbSqlite3 const& ) = delete;
 
 private:
-    Db(): m_db_name( "test.db" ){}
-    ~Db(){}
+    DbSqlite3(): m_db_name( "test.db" ){}
+    ~DbSqlite3(){}
 private:
     int m_status;
     sqlite3* m_db;
@@ -221,6 +515,7 @@ private:
 struct Content{
 
     string url;
+    string topic;
     path path;
     ContentType type;
 };
@@ -237,6 +532,20 @@ public:
 
     static const char* header_image_jpeg(){
         return "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nConnection: close\r\n\r\n";
+    }
+
+    static void prepare_link_page( const std::string& topic, 
+                                          const std::vector<std::string>& urls,
+                                          std::string& result){
+        result += header_txt();
+        result += "<html><body>\r\n";
+        result += "<h2>Pomoc na wybrany temat: " + topic + "</h2>\r\n";
+
+        for( auto url : urls ){
+            result += "<p>link: <a href=\"" + url + "\">" + url + "</a></p>\r\n";
+        }
+
+        result += "</html></body>\r\n";
     }
 
     static set<path> list_files( const path& dir ){
@@ -263,6 +572,20 @@ public:
         return result;
     }
 
+    static void find_regex( const std::string& file, std::string& topic ){
+        boost::regex re( "name=\\\"keywords\\\" content=\\\"#([\\w]*)\\\"" );
+        std::ifstream iss( file );
+        std::string line;
+        boost::smatch what;
+        while( std::getline( iss, line ) ){
+            if( boost::regex_search( line, what, re ) ){
+                std::cout << "ZNALAZLEM TOPIC !!!!" << endl;
+                std::cout << what[ 1 ].str() << endl;
+                topic = what[ 1 ].str();
+            }
+        }
+    }
+
     static vector<Content> list_to_compile( const path& root, const set<path>& files ){
         vector<Content> result;
 
@@ -283,7 +606,10 @@ public:
             }
             else if( file.extension() == ".html" ||
                      file.extension() == ".htm" ){
+                std::string topic = "None";
+                find_regex( file.string(), topic );
                 tmp.type = ContentType::Page;
+                tmp.topic = topic;
             }
             else{
                 tmp.type = ContentType::None;
@@ -302,7 +628,7 @@ public:
     bool handleGet( CivetServer* server, struct mg_connection* conn )
     {
         std::vector<std::string> pages;
-        Db::getInstance().get_all_urls( ContentType::Page, pages );
+        DbOracle::getInstance().get_all_urls( ContentType::Page, pages );
 
         mg_printf( conn, Tools::header_txt() );
         mg_printf( conn, "<html><body>\r\n" );
@@ -351,7 +677,7 @@ public:
 class ContentHandler: public CivetHandler
 {
 public:
-    bool handleGet( CivetServer* server, struct mg_connection* conn)
+    bool handleGet( CivetServer* server, struct mg_connection* conn )
     {
         const struct mg_request_info* req_info = mg_get_request_info( conn );
         std::cout << "URL: " << req_info->request_uri << std::endl;
@@ -359,7 +685,7 @@ public:
         std::vector<char> content;
         int size = 0;
         ContentType type = ContentType::None;
-        Db::getInstance().get_content( req_info->request_uri, content, size, type);
+        DbOracle::getInstance().get_content( req_info->request_uri, content, size, type);
         
         if( type == ContentType::Image_jpg ){
             mg_printf( conn, Tools::header_image_jpeg() );
@@ -374,6 +700,25 @@ public:
             mg_printf( conn, reinterpret_cast< char* >( &content[ 0 ] ) );
         }
  
+        return true;
+    }
+};
+
+class HelpHandler: public CivetHandler
+{
+    bool handleGet( CivetServer* server, struct mg_connection* conn ){
+        const struct mg_request_info* req_info = mg_get_request_info( conn );
+        std::cout << "Topic: " << req_info->request_uri << std::endl;
+        std::string topic_tmp = req_info->request_uri;
+        topic_tmp.erase( topic_tmp.begin(), topic_tmp.begin() + 7 );
+
+        std::vector<std::string> urls;
+        DbOracle::getInstance().get_content_by_topic( topic_tmp, urls );
+
+        std::string page;
+        Tools::prepare_link_page( topic_tmp, urls, page );
+        mg_printf( conn, page.c_str() );
+
         return true;
     }
 };
@@ -686,6 +1031,9 @@ class WebSocketHandler: public CivetWebSocketHandler {
 
 int main( int argc, char* argv[] )
 {
+    Configuration config;
+    ReadDbConfig( config );
+
     const char* options[] = {
         "document_root", DOCUMENT_ROOT, "listening_ports", PORT, 0 };
 
@@ -711,8 +1059,12 @@ int main( int argc, char* argv[] )
     WsStartHandler h_ws;
     server.addHandler( "/ws", h_ws );
 
+    HelpHandler h_help;
+    server.addHandler( "/topic", h_help );
+
     ContentHandler h_content;
     server.addHandler( "**", h_content );
+
 
 #ifdef NO_FILES
     /* This handler will handle "everything else", including
@@ -739,31 +1091,48 @@ int main( int argc, char* argv[] )
     std::cout << "Run example at http://localhost:" << PORT << EXAMPLE_URI << std::endl;
     std::cout << "Exit at http://localhost:" << PORT << EXIT_URI << std::endl;
     
-    Db::getInstance().open_db();
-    Db::getInstance().create_tables();
-
     path help_dir( "c:\\Jopa\\HOME\\Projekty\\sentinel\\help" );
-    auto files = Tools::list_files( help_dir );
-    auto content = Tools::list_to_compile( help_dir, files );
+    path help_dir2( "c:\\Projekty\\trunk\\src\\rvs_help\\help2" );
+    auto files = Tools::list_files( help_dir2 );
+    auto content = Tools::list_to_compile( help_dir2, files );
+    
+    //Oracle
+    DbOracle::getInstance().open_db( config.connectionString );
+    
+    DbOracle::getInstance().create_tables();
+    for( auto item : content ){
+        cout << "£adowanie do bazy: " << endl;
+        cout << "url: " << item.url << endl;
+        cout << "file: " << item.path << endl;
+        cout << "type: " << static_cast< int >( item.type ) << endl;
+        cout << "topic" << item.topic << endl;
+
+        DbOracle::getInstance().put_content( item.url, static_cast< int >( item.type ),
+                                             item.topic, item.path.string() );
+    }
+    
+
+    //SQLite3
+    /*
+    DbSqlite3::getInstance().open_db( "jajo" );
+    DbSqlite3::getInstance().create_tables();
+
     for( auto item : content ){
         cout << "£adowanie do bazy: " << endl;
         cout << "url: " << item.url << endl;
         cout << "file: " << item.path << endl;
         cout << "type: " << static_cast< int >( item.type ) << endl;
 
-        Db::getInstance().insert_blob( item.url, static_cast< int >( item.type ), 
-                                       item.path.string() );
+        DbSqlite3::getInstance().put_content( item.url, static_cast< int >( item.type ), 
+                                              item.path.string() );
     }
-
+    */
     while ( !exitNow ) {
-#ifdef _WIN32
-        Sleep( 1000 );
-#else
-        sleep( 1 );
-#endif
+        this_thread::sleep_for( chrono::seconds( 1 ) );
     }
 
-    Db::getInstance().close_db();
+    DbSqlite3::getInstance().close_db();
+    DbOracle::getInstance().close_db();
     std::cout << "Bye!" << std::endl;
 
     return 0;
